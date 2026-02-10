@@ -35,7 +35,7 @@ bool ConnectFour::actionForEmptyHolder(BitHolder &holder) {
     }
     Bit *bit = PieceForPlayer(getCurrentPlayer()->playerNumber() == 0 ? HUMAN_PLAYER : AI_PLAYER);
     if (bit) {
-        int x = (holder.getPosition().x - 35) / 70;
+        int x = ((int)holder.getPosition().x - 35) / 70;
         int targetRow = -1;
         for (int row = 5; row >= 0; row--) {
             if (_grid->getSquare(x,row)->bit() == nullptr) {
@@ -79,6 +79,9 @@ Player* ConnectFour::ownerAt(int index ) const
     if (!square || !square->bit()) {
         return nullptr;
     }
+    if (index < 0 || index >= 42) {
+        return nullptr;
+    }
     return square->bit()->getOwner();
 }
 
@@ -86,8 +89,8 @@ Player* ConnectFour::checkForWinner()
 {   
     bool isWinner = false;
     // iterate through every slot on the board
-    for (int y=0; y<7; y++) {
-        for (int x=0; x<8; x++) {
+    for (int y=0; y<6; y++) {
+        for (int x=0; x<7; x++) {
             // now, ideally, for each square, if there is a piece then we want
             // to check each of the neighboring cells (kinda like minesweeper)
             // using corresponding indices. I saw a similar technique in the
@@ -113,19 +116,14 @@ bool ConnectFour::verifyCandidate(int cIndex) {
     for (int y=-1; y<=1; y++) {
         for (int x=-1; x<=1; x++) {
             if (y == 0 && x == 0) continue; // skip the original character index
-            int column  = cIndex % 7;
+            int col     = cIndex % 7;
             int row     = cIndex / 7;
 
-            if (
-                // y is 0? don't need to check vertical validity
-                // y is negative? check if row - 3 is below 0, if so, OOB
-                // vice versa for positive
-                y == 0 ? false : ((y == -1 ? row + y*3 <= 0 : row + y*3 > 6)) ||
-                // x is 0? no need again for horizontal
-                // x is negative? check if column - 3 is below 0, if yes, OOB
-                // vice versa for positive
-                x == 0 ? false : ((x == -1 ? column + x*3 <= 0 : column + x*3 > 7))
-            ) {
+            int targetRow = row + (y * 3);
+            int targetCol = col + (x * 3);
+
+            // cleaner way to do what i was doing earlier, no big gross if statement
+            if (targetRow < 0 || targetRow > 5 || targetCol < 0 || targetCol > 6) {
                 continue;
             }
 
@@ -138,10 +136,7 @@ bool ConnectFour::verifyCandidate(int cIndex) {
                 owner == ownerAt(cIndex + offset) &&
                 owner == ownerAt(cIndex + offset*2) &&
                 owner == ownerAt(cIndex + offset*3)
-            ) {
-                std::cout << cIndex << "," << cIndex + offset << "," << cIndex + offset*2 << "," << cIndex + offset*3 << std::endl;
-                return true;
-            };
+            ) return true;
         }
     }
     return false;
@@ -188,25 +183,128 @@ void ConnectFour::setStateString(const std::string &s)
     });
 }
 
-// just pasted the TTT AI code for now
 void ConnectFour::updateAI() 
 {
-    BitHolder* bestMove = nullptr;
-    std::string state = stateString();
+    // negamax AI
 
-    // Traverse all cells, evaluate minimax function for all empty cells
-    _grid->forEachSquare([&](ChessSquare* square, int x, int y) {
-        int index = y * 3 + x;
-        // Check if cell is empty
-        if (state[index] == '0') {
-            bestMove = square;
-        }
-    });
+    std::string currentState = stateString();
 
+    int bestMove = -10000;
+    int bestSquare = -1;
 
-    // Make the best move
-    if(bestMove) {
-        if (actionForEmptyHolder(*bestMove)) {
+    // move through each column and determine best move
+    for (int x = 0; x <= 6; x++) {
+        // check each row starting from the bottom, if it's empty, then place it
+        for (int row = 5; row >= 0; row--) {
+            int index = x + row*7;
+            if (currentState[index] == '0') {
+                currentState[index] = '2';
+                int newValue = -negamax(currentState, 0, -10000000, 10000000, HUMAN_PLAYER);
+                currentState[index] = '0';
+                if (newValue > bestMove) {
+                    bestSquare = index;
+                    bestMove = newValue;
+                }
+                break;
+            }
         }
     }
+
+    if (bestSquare != -1) {
+        // make a move based on our best square
+        actionForEmptyHolder(*_grid->getSquare(bestSquare%7, bestSquare/7));
+    }
+}
+
+bool ConnectFour::aiTestForTerminal(std::string& state) {            // helper for the AI to find if the board is terminal using a state string
+    if (state.find('0') == std::string::npos) {         // string's find function will either return the position or return npos for no existence.
+        return true;        // terminal state reached
+    }
+    return false;           // no terminal state
+}
+
+//
+// same as checkForWinner() and verifyCandidate() above except it uses the state string instead of the grid object
+//
+int ConnectFour::aiBoardEval(std::string& state, int playerColor, int depth) {                   // helper for the AI to find if the board is terminal
+    char playerChar = (playerColor == HUMAN_PLAYER) ? '1' : '2';
+    for (int y=0; y<=5; y++) {
+        for (int x=0; x<=6; x++) {
+            int index = x + y*7;
+            char candidate = state[index];
+            // only proceed if there is a piece in the current slot
+            if (candidate == '0') {
+                continue;
+            }
+            // verifyCandidate() except it uses state string
+            for (int yDir=-1; yDir<=1; yDir++) {
+                for (int xDir=-1; xDir<=1; xDir++) {
+                    if (yDir == 0 && xDir == 0) continue; // skip the original character index
+                    int col     = index % 7;
+                    int row     = index / 7;
+
+                    int targetRow = row + (yDir * 3);
+                    int targetCol = col + (xDir * 3);
+
+                    // cleaner way to do what i was doing earlier, no big gross if statement
+                    if (targetRow < 0 || targetRow > 5 || targetCol < 0 || targetCol > 6) {
+                        continue;
+                    }
+
+                    int offset = yDir*7 + xDir;
+                    char owner = state[index];
+                    if ( // check for 4 in a row in the given direction
+                        owner != '0' &&
+                        owner == state[index + offset] &&
+                        owner == state[index + offset*2] &&
+                        owner == state[index + offset*3]
+                    ) {
+                        return 100 - depth;
+                    };
+                }
+            }
+        }
+    }
+    return 0;
+}
+
+int ConnectFour::negamax(std::string& state, int depth, int alpha, int beta, int playerColor) {
+    // std::cout << depth << std::endl;
+    // depth limit because i don't trust this thing
+    std::cout << depth << std::endl;
+
+    if (depth > 3) {
+        return 0;
+    }
+    
+    int score = aiBoardEval(state, playerColor, depth);
+    if (score != 0) {
+        return -score; 
+    }
+
+    if (aiTestForTerminal(state)) {     // draw check
+        return 0;                       
+    }
+
+    int bestVal = -100000;
+    for (int x = 0; x < 7; x++) {
+        for (int row = 5; row >= 0; row--) {
+            int i = x + row*7;
+            if (state[i] == '0') {
+                state[i] = playerColor == HUMAN_PLAYER ? '1' : '2';     // push move
+                int newVal = -negamax(state, depth + 1, -beta, -alpha, -playerColor);
+                state[i] = '0';         // pop move
+                if (newVal > bestVal) {
+                    bestVal = newVal;
+                }
+                // alpha beta pruning
+                if (newVal > alpha) {
+                    alpha = newVal;
+                }
+                if (alpha > beta) break;
+            }
+            break;
+        }
+    }
+    return bestVal;
 }

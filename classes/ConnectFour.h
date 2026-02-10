@@ -20,11 +20,14 @@ class ConnectFour : public Game {
         void        stopGame() override;
 
         void        updateAI() override;
-        bool        gameHasAI() override { return false; } // Set to true when AI is implemented
+        bool        gameHasAI() override { return true; } // Set to true when AI is implemented
         Grid*       getGrid() override { return _grid; }
     private:
         Bit*        PieceForPlayer(const int playerNumber);
         Player*     ownerAt(int index) const;
         bool        verifyCandidate(int cIndex);
+        bool        aiTestForTerminal(std::string& state);
+        int         aiBoardEval(std::string& state, int playerColor, int depth);
+        int         negamax(std::string& state, int depth, int alpha, int beta, int playerColor);
         Grid*       _grid;
 };

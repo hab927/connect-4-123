@@ -189,14 +189,15 @@ void ConnectFour::updateAI()
 
     std::string currentState = stateString();
 
-    int bestMove = -10000;
+    int bestMove = -10000000;
     int bestSquare = -1;
 
     // move through each column and determine best move
+    int columns[7] = {3,2,4,1,5,0,6};
     for (int x = 0; x <= 6; x++) {
         // check each row starting from the bottom, if it's empty, then place it
         for (int row = 5; row >= 0; row--) {
-            int index = x + row*7;
+            int index = columns[x] + row*7;
             if (currentState[index] == '0') {
                 currentState[index] = '2';
                 int newValue = -negamax(currentState, 0, -10000000, 10000000, HUMAN_PLAYER);
@@ -259,7 +260,8 @@ int ConnectFour::aiBoardEval(std::string& state, int playerColor, int depth) {  
                         owner == state[index + offset*2] &&
                         owner == state[index + offset*3]
                     ) {
-                        return 100 - depth;
+                        int score = 100 - depth;
+                        return (owner == playerChar) ? score : -score;
                     };
                 }
             }
@@ -271,15 +273,14 @@ int ConnectFour::aiBoardEval(std::string& state, int playerColor, int depth) {  
 int ConnectFour::negamax(std::string& state, int depth, int alpha, int beta, int playerColor) {
     // std::cout << depth << std::endl;
     // depth limit because i don't trust this thing
-    std::cout << depth << std::endl;
 
-    if (depth > 3) {
+    if (depth > 5) {
         return 0;
     }
     
     int score = aiBoardEval(state, playerColor, depth);
     if (score != 0) {
-        return -score; 
+        return score; 
     }
 
     if (aiTestForTerminal(state)) {     // draw check
@@ -287,9 +288,10 @@ int ConnectFour::negamax(std::string& state, int depth, int alpha, int beta, int
     }
 
     int bestVal = -100000;
+    int columns[7] = {3,2,4,1,5,0,6};
     for (int x = 0; x < 7; x++) {
         for (int row = 5; row >= 0; row--) {
-            int i = x + row*7;
+            int i = columns[x] + row*7;
             if (state[i] == '0') {
                 state[i] = playerColor == HUMAN_PLAYER ? '1' : '2';     // push move
                 int newVal = -negamax(state, depth + 1, -beta, -alpha, -playerColor);
@@ -301,9 +303,9 @@ int ConnectFour::negamax(std::string& state, int depth, int alpha, int beta, int
                 if (newVal > alpha) {
                     alpha = newVal;
                 }
-                if (alpha > beta) break;
+                if (alpha >= beta) break;
+                break;
             }
-            break;
         }
     }
     return bestVal;

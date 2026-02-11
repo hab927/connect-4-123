@@ -227,42 +227,37 @@ bool ConnectFour::aiTestForTerminal(std::string& state) {            // helper f
 //
 // same as checkForWinner() and verifyCandidate() above except it uses the state string instead of the grid object
 //
-int ConnectFour::aiBoardEval(std::string& state, int playerColor, int depth) {                   // helper for the AI to find if the board is terminal
+int ConnectFour::aiBoardEval(std::string& state, int playerColor, int depth) {
     char playerChar = (playerColor == HUMAN_PLAYER) ? '1' : '2';
-    for (int y=0; y<=5; y++) {
-        for (int x=0; x<=6; x++) {
-            int index = x + y*7;
-            char candidate = state[index];
-            // only proceed if there is a piece in the current slot
-            if (candidate == '0') {
-                continue;
-            }
-            // verifyCandidate() except it uses state string
-            for (int yDir=-1; yDir<=1; yDir++) {
-                for (int xDir=-1; xDir<=1; xDir++) {
-                    if (yDir == 0 && xDir == 0) continue; // skip the original character index
-                    int col     = index % 7;
-                    int row     = index / 7;
 
-                    int targetRow = row + (yDir * 3);
-                    int targetCol = col + (xDir * 3);
+    // scan everywhere but only check 4 directions
+    for (int y = 0; y < 6; y++) {
+        for (int x = 0; x < 7; x++) {
+            int index = x + y * 7;
+            char owner = state[index];
+            if (owner == '0') continue;
 
-                    // cleaner way to do what i was doing earlier, no big gross if statement
-                    if (targetRow < 0 || targetRow > 5 || targetCol < 0 || targetCol > 6) {
-                        continue;
-                    }
+            // reducing amount of checks to hopefully make it faster
+            int dy[] = {0, 1, 1, 1};
+            int dx[] = {1, 0, 1, -1};
 
-                    int offset = yDir*7 + xDir;
-                    char owner = state[index];
-                    if ( // check for 4 in a row in the given direction
-                        owner != '0' &&
-                        owner == state[index + offset] &&
-                        owner == state[index + offset*2] &&
-                        owner == state[index + offset*3]
-                    ) {
-                        int score = 100 - depth;
-                        return (owner == playerChar) ? score : -score;
-                    };
+            for (int d = 0; d < 4; d++) {
+                int targetRow = y + (dy[d] * 3);
+                int targetCol = x + (dx[d] * 3);
+
+                if (targetRow < 0 || targetRow > 5 || targetCol < 0 || targetCol > 6) {
+                    continue;
+                }
+
+                int offset = dy[d] * 7 + dx[d];
+                
+                // won't call a function for each step
+                if (owner == state[index + offset] &&
+                    owner == state[index + offset * 2] &&
+                    owner == state[index + offset * 3]) 
+                {
+                    int score = 2000 - depth;
+                    return (owner == playerChar) ? score : -score;
                 }
             }
         }
@@ -270,12 +265,13 @@ int ConnectFour::aiBoardEval(std::string& state, int playerColor, int depth) {  
     return 0;
 }
 
+
 int ConnectFour::negamax(std::string& state, int depth, int alpha, int beta, int playerColor) {
     // std::cout << depth << std::endl;
     // depth limit because i don't trust this thing
 
-    if (depth > 5) {
-        return 0;
+    if (depth > 6) {
+        return evaluatePositionalAdvantage(state, playerColor);
     }
     
     int score = aiBoardEval(state, playerColor, depth);
@@ -306,7 +302,63 @@ int ConnectFour::negamax(std::string& state, int depth, int alpha, int beta, int
                 if (alpha >= beta) break;
                 break;
             }
+            if (alpha >= beta) break;
         }
+        if (alpha >= beta) break;
     }
     return bestVal;
+}
+
+//
+//  function that checks each window of 4 and outputs a score based on if it's good or bad for the current player
+//
+int ConnectFour::evaluatePositionalAdvantage(std::string& state, int playerColor) {
+    char playerChar = (playerColor == HUMAN_PLAYER) ? '1' : '2';
+    char oppChar = (playerColor == HUMAN_PLAYER) ? '2' : '1';
+    int totalScore = 0;
+
+    for (int y = 0; y <= 5; y++) {
+        for (int x = 0; x <= 6; x++) {
+            int index = x + y * 7;
+            
+            int dy[] = {0, 1, 1, 1};
+            int dx[] = {1, 0, 1, -1};
+
+            for (int d = 0; d < 4; d++) {
+                int targetRow = y + (dy[d] * 3);
+                int targetCol = x + (dx[d] * 3);
+
+                if (targetRow < 0 || targetRow > 5 || targetCol < 0 || targetCol > 6) {
+                    continue;
+                }
+
+                int pCount = 0;
+                int oCount = 0;
+                int offset = dy[d] * 7 + dx[d];
+
+                for (int i = 0; i < 4; i++) {
+                    char cell = state[index + (offset * i)];
+                    if (cell == playerChar) pCount++;
+                    else if (cell == oppChar) oCount++;
+                }
+
+                if (oCount == 0) { 
+                    if (pCount == 3) totalScore += 50;
+                    else if (pCount == 2) totalScore += 10;
+                } 
+                else if (pCount == 0) {
+                    if (oCount == 3) totalScore -= 80;
+                    else if (oCount == 2) totalScore -= 25;
+                }
+            }
+        }
+    }
+
+    // Add a small bonus for center column control (standard strategy)
+    for (int y = 0; y <= 5; y++) {
+        if (state[3 + y * 7] == playerChar) totalScore += 5;
+        if (state[3 + y * 7] == oppChar) totalScore -= 5;
+    }
+
+    return totalScore;
 }

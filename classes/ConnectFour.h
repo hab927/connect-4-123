@@ -29,5 +29,6 @@ class ConnectFour : public Game {
         bool        aiTestForTerminal(std::string& state);
         int         aiBoardEval(std::string& state, int playerColor, int depth);
         int         negamax(std::string& state, int depth, int alpha, int beta, int playerColor);
+        int         evaluatePositionalAdvantage(std::string& state, int playerColor);
         Grid*       _grid;
 };

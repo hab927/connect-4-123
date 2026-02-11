@@ -183,11 +183,41 @@ void ConnectFour::setStateString(const std::string &s)
     });
 }
 
+// conversion from state string to bit board representation for SUPER fast performance
+std::vector<long> ConnectFour::convertToBB(std::string &state) {
+    // bitboard representation starts at final row and ends at the top, and moves from left to right
+    long humanBB = 0b0;
+    long aiBB = 0b0;
+    // get the bitboard for the human player
+    for (int row = 5; row <= 0; row--) {
+        for (int col = 0; col <= 6; col++) {
+            int index = row*7 + col;
+            if (state[index] == '1') { // human player
+                humanBB + 1;
+                humanBB << 1;
+            }
+            else if (state[index] == '2') {
+                aiBB << 1;
+                aiBB << 2;
+            }
+            else {
+                humanBB << 1;
+                aiBB << 1;
+            }
+        }
+    }
+    std::vector<long> result = {humanBB, aiBB};
+    return result;
+}
+
 void ConnectFour::updateAI() 
 {
     // negamax AI
 
     std::string currentState = stateString();
+
+    // convert state string representation into bit board representation
+    std::vector<long> stateBB = convertToBB(currentState);
 
     int bestMove = -10000000;
     int bestSquare = -1;

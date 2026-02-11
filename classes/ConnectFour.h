@@ -30,5 +30,6 @@ class ConnectFour : public Game {
         int         aiBoardEval(std::string& state, int playerColor, int depth);
         int         negamax(std::string& state, int depth, int alpha, int beta, int playerColor);
         int         evaluatePositionalAdvantage(std::string& state, int playerColor);
+        std::vector<long>   convertToBB(std::string &state);
         Grid*       _grid;
 };
